@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { Guest } from '../types';
+import type { Guest, HeadRole } from '../types';
 import { generateId, parseGuestsText } from '../utils';
 import { TAG_OPTIONS } from '../types';
+import { HEAD_ROLE_OPTIONS } from '../headTable';
 
 interface Props {
   guests: Guest[];
@@ -105,6 +106,54 @@ export default function GuestPool({ guests, selectedId, onSelect, onAdd, onRemov
             </div>
           </label>
           <label>
+            主桌角色
+            <select
+              value={selectedGuest.headRole || ''}
+              onChange={(e) =>
+                onUpdate({ ...selectedGuest, headRole: (e.target.value || undefined) as HeadRole | undefined })
+              }
+            >
+              <option value="">（普通宾客）</option>
+              {HEAD_ROLE_OPTIONS.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="guest-editor-row">
+            <label>
+              辈分
+              <input
+                type="number"
+                min={1}
+                max={9}
+                placeholder="自动"
+                value={selectedGuest.generation ?? ''}
+                onChange={(e) =>
+                  onUpdate({
+                    ...selectedGuest,
+                    generation: e.target.value === '' ? undefined : Math.max(1, Math.min(9, parseInt(e.target.value) || 1)),
+                  })
+                }
+              />
+            </label>
+            <label>
+              年龄
+              <input
+                type="number"
+                min={0}
+                max={120}
+                placeholder="选填"
+                value={selectedGuest.age ?? ''}
+                onChange={(e) =>
+                  onUpdate({
+                    ...selectedGuest,
+                    age: e.target.value === '' ? undefined : Math.max(0, Math.min(120, parseInt(e.target.value) || 0)),
+                  })
+                }
+              />
+            </label>
+          </div>
+          <label>
             备注
             <input
               value={selectedGuest.note || ''}
@@ -135,6 +184,11 @@ export default function GuestPool({ guests, selectedId, onSelect, onAdd, onRemov
               onClick={() => onSelect(selectedId === g.id ? null : g.id)}
             >
               <span className="guest-name">{g.name}</span>
+              {g.headRole && (
+                <span className="guest-role">
+                  {HEAD_ROLE_OPTIONS.find((r) => r.value === g.headRole)?.label}
+                </span>
+              )}
               {g.tags.length > 0 && <span className="guest-tags">{g.tags.join(', ')}</span>}
               {isConflict && (
                 <span

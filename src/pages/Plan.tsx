@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getPlan, savePlan, setRecentPlanId } from '../db';
 import { createHistoryManager } from '../history';
 import { getConflictMap, getTableStats } from '../utils';
+import { normalizePlan } from '../headTable';
 import type { Plan as PlanType, Command } from '../types';
 import GuestPool from '../components/GuestPool';
 import Canvas from '../components/Canvas';
@@ -22,16 +23,16 @@ export default function PlanPage() {
 
   useEffect(() => {
     if (!id) return;
-    getPlan(id).then((p) => {
-      if (!p) {
-        const fallback = { id, name: '未命名方案', tables: [], guests: [], rules: [], updatedAt: Date.now() };
-        historyRef.current = createHistoryManager(fallback);
-        setPlan(fallback);
+    getPlan(id).then((raw) => {
+      let p: PlanType;
+      if (!raw) {
+        p = normalizePlan({ id, name: '未命名方案', tables: [], guests: [], rules: [], updatedAt: Date.now() });
       } else {
-        historyRef.current = createHistoryManager(p);
-        setPlan(p);
-        setRecentPlanId(id);
+        p = normalizePlan(raw);
       }
+      historyRef.current = createHistoryManager(p);
+      setPlan(p);
+      setRecentPlanId(id);
       setLoading(false);
     });
   }, [id]);

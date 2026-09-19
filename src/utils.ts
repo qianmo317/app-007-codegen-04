@@ -78,9 +78,10 @@ export function getTableStats(plan: Plan) {
     return !atTable;
   });
   for (const t of plan.tables) {
-    seated += t.seatOrder.length;
+    const count = t.seatOrder.reduce((n, id) => n + (id ? 1 : 0), 0);
+    seated += count;
     capacity += t.capacity;
-    emptySeats += Math.max(0, t.capacity - t.seatOrder.length);
+    emptySeats += Math.max(0, t.capacity - count);
   }
   return { seated, capacity, emptySeats, totalGuests: plan.guests.length, unassignedCount: unassigned.length };
 }
