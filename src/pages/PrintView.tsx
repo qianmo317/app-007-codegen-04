@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getPlan } from '../db';
-import type { Plan as PlanType } from '../types';
+import type { Plan as PlanType, SeatMark } from '../types';
+import { isHeadGroup, resolveHeadFacing, facingLabel } from '../headSeating';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -64,30 +65,46 @@ export default function PrintView() {
 }
 
 function TableCards({ plan }: { plan: PlanType }) {
+  const facing = resolveHeadFacing(plan.venue);
+  const markMap = new Map<string, SeatMark>();
+  for (const m of plan.seatMarks ?? []) markMap.set(m.guestId, m);
+  // 主桌排在最前
+  const tables = [...plan.tables].sort((a, b) => {
+    const av = a.isHeadTable ? 0 : a.isSecondaryHead ? 1 : 2;
+    const bv = b.isHeadTable ? 0 : b.isSecondaryHead ? 1 : 2;
+    return av - bv;
+  });
   return (
     <div className="table-cards">
-      {plan.tables.map((table) => (
-        <div key={table.id} className="table-card">
-          <div className="card-header">{table.label}</div>
-          <div className="card-seats">
-            {table.seatOrder.map((gid, i) => {
-              const guest = plan.guests.find((g) => g.id === gid);
-              return (
-                <div key={i} className="card-seat">
-                  <span className="seat-number">{i + 1}号位</span>
-                  <span className="seat-guest">{guest?.name || '空'}</span>
-                </div>
-              );
-            })}
-            {Array.from({ length: Math.max(0, table.capacity - table.seatOrder.length) }).map((_, i) => (
-              <div key={`empty-${i}`} className="card-seat empty">
-                <span className="seat-number">{table.seatOrder.length + i + 1}号位</span>
-                <span className="seat-guest">（空）</span>
-              </div>
-            ))}
+      {tables.map((table) => {
+        const head = isHeadGroup(table);
+        return (
+          <div key={table.id} className={`table-card ${table.isHeadTable ? 'head-card' : ''} ${table.isSecondaryHead ? 'secondary-card' : ''}`}>
+            <div className="card-header">
+              {table.isHeadTable ? '👑 ' : table.isSecondaryHead ? '副·' : ''}{table.label}
+              {head && <span className="card-facing">主位面向{facingLabel(facing)}方</span>}
+            </div>
+            <div className="card-seats">
+              {Array.from({ length: table.capacity }).map((_, i) => {
+                const gid = table.seatOrder[i] ?? null;
+                const guest = gid ? plan.guests.find((g) => g.id === gid) : null;
+                const mark = gid ? markMap.get(gid) : undefined;
+                const moved = mark && (mark.prevTableId !== table.id || mark.prevSeatNo !== i + 1);
+                return (
+                  <div key={i} className={`card-seat ${!guest ? 'empty' : ''} ${i === 0 && table.isHeadTable ? 'card-head-seat' : ''}`}>
+                    <span className="seat-number">{i + 1}号位{i === 0 && table.isHeadTable ? '（主位）' : ''}</span>
+                    <span className="seat-guest">
+                      {guest ? guest.name : '（空）'}
+                      {guest?.easyAccess ? ' 🚪' : ''}
+                      {guest && moved && <em className="card-moved">（{mark!.prevSeatNo ? `${mark!.prevSeatNo}→` : '新→'}{i + 1}）</em>}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -100,14 +117,15 @@ function LayoutDiagram({ plan }: { plan: PlanType }) {
         {plan.tables.map((table) => (
           <div
             key={table.id}
-            className={`layout-table ${table.shape}`}
+            className={`layout-table ${table.shape} ${table.isHeadTable ? 'layout-head' : ''} ${table.isSecondaryHead ? 'layout-secondary' : ''}`}
             style={{ left: table.x, top: table.y }}
           >
-            <div className="layout-label">{table.label}</div>
+            <div className="layout-label">{table.isHeadTable ? '👑 ' : table.isSecondaryHead ? '副·' : ''}{table.label}</div>
             <div className="layout-guests">
-              {table.seatOrder.map((gid) => {
+              {table.seatOrder.map((gid, i) => {
+                if (!gid) return null;
                 const guest = plan.guests.find((g) => g.id === gid);
-                return <span key={gid} className="layout-guest">{guest?.name}</span>;
+                return <span key={i} className="layout-guest">{guest?.name}</span>;
               })}
             </div>
           </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { Guest } from '../types';
+import { GENERATION_OPTIONS, HEAD_ROLE_OPTIONS, TAG_OPTIONS } from '../types';
 import { generateId, parseGuestsText } from '../utils';
-import { TAG_OPTIONS } from '../types';
 
 interface Props {
   guests: Guest[];
@@ -105,6 +105,58 @@ export default function GuestPool({ guests, selectedId, onSelect, onAdd, onRemov
             </div>
           </label>
           <label>
+            主桌身份
+            <select
+              value={selectedGuest.headRole || ''}
+              onChange={(e) => {
+                const role = e.target.value || undefined;
+                const opt = HEAD_ROLE_OPTIONS.find((o) => o.value === role);
+                onUpdate({
+                  ...selectedGuest,
+                  headRole: role as Guest['headRole'],
+                  familySide: opt?.side ?? selectedGuest.familySide,
+                });
+              }}
+            >
+              <option value="">— 不坐主桌 —</option>
+              {HEAD_ROLE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+          <div className="head-fields">
+            <label>
+              辈分
+              <select
+                value={selectedGuest.generation ?? 2}
+                onChange={(e) => onUpdate({ ...selectedGuest, generation: parseInt(e.target.value) })}
+              >
+                {GENERATION_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              家侧
+              <select
+                value={selectedGuest.familySide || ''}
+                onChange={(e) => onUpdate({ ...selectedGuest, familySide: (e.target.value || undefined) as Guest['familySide'] })}
+            >
+                <option value="">自动</option>
+                <option value="groom">男家侧</option>
+                <option value="bride">女家侧</option>
+              </select>
+            </label>
+          </div>
+          <label className="child-seat-label">
+            <input
+              type="checkbox"
+              checked={!!selectedGuest.easyAccess}
+              onChange={(e) => onUpdate({ ...selectedGuest, easyAccess: e.target.checked })}
+            />
+            老人/小孩/行动不便（尽量近通道）
+          </label>
+          <label>
             备注
             <input
               value={selectedGuest.note || ''}
@@ -135,6 +187,11 @@ export default function GuestPool({ guests, selectedId, onSelect, onAdd, onRemov
               onClick={() => onSelect(selectedId === g.id ? null : g.id)}
             >
               <span className="guest-name">{g.name}</span>
+              {g.headRole && (
+                <span className="guest-role" title="主桌身份">
+                  {HEAD_ROLE_OPTIONS.find((o) => o.value === g.headRole)?.label}
+                </span>
+              )}
               {g.tags.length > 0 && <span className="guest-tags">{g.tags.join(', ')}</span>}
               {isConflict && (
                 <span

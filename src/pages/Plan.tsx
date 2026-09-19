@@ -8,6 +8,8 @@ import GuestPool from '../components/GuestPool';
 import Canvas from '../components/Canvas';
 import RulesPanel from '../components/RulesPanel';
 import StatsBar from '../components/StatsBar';
+import VenueBar from '../components/VenueBar';
+import MarksPanel from '../components/MarksPanel';
 
 export default function PlanPage() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +18,7 @@ export default function PlanPage() {
   const [loading, setLoading] = useState(true);
   const [selectedGuestId, setSelectedGuestId] = useState<string | null>(null);
   const [dragGuestId, setDragGuestId] = useState<string | null>(null);
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
   const historyRef = useRef<ReturnType<typeof createHistoryManager> | null>(null);
   const [conflictMap, setConflictMap] = useState<Map<string, string[]>>(new Map());
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -24,7 +27,10 @@ export default function PlanPage() {
     if (!id) return;
     getPlan(id).then((p) => {
       if (!p) {
-        const fallback = { id, name: '未命名方案', tables: [], guests: [], rules: [], updatedAt: Date.now() };
+        const fallback: PlanType = {
+          id, name: '未命名方案', tables: [], guests: [], rules: [], updatedAt: Date.now(),
+          venue: { entranceSide: 'south', stageSide: 'north' }, seatMarks: [],
+        };
         historyRef.current = createHistoryManager(fallback);
         setPlan(fallback);
       } else {
@@ -103,6 +109,12 @@ export default function PlanPage() {
         </div>
       </header>
       <StatsBar stats={stats} />
+      <VenueBar
+        plan={plan}
+        dispatch={dispatch}
+        selectedTableId={selectedTableId}
+        onHeadTableChange={setSelectedTableId}
+      />
       <div className="plan-body">
         <GuestPool
           guests={plan.guests}
@@ -117,13 +129,18 @@ export default function PlanPage() {
             dispatch({ type: 'updateGuests', guests });
           }}
         />
-        <Canvas
-          plan={plan}
-          dragGuestId={dragGuestId}
-          setDragGuestId={setDragGuestId}
-          conflictMap={conflictMap}
-          dispatch={dispatch}
-        />
+        <div className="canvas-wrap">
+          <Canvas
+            plan={plan}
+            dragGuestId={dragGuestId}
+            setDragGuestId={setDragGuestId}
+            conflictMap={conflictMap}
+            dispatch={dispatch}
+            selectedTableId={selectedTableId}
+            setSelectedTableId={setSelectedTableId}
+          />
+          <MarksPanel plan={plan} />
+        </div>
         <RulesPanel
           plan={plan}
           dispatch={dispatch}

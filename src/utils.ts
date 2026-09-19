@@ -1,8 +1,26 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Plan } from './types';
+import type { Plan, Table } from './types';
 
 export function generateId(): string {
   return uuidv4();
+}
+
+/** 实际入座人数（稀疏 seatOrder 中的非空位数） */
+export function occupiedCount(t: Table): number {
+  return t.seatOrder.filter((id): id is string => !!id).length;
+}
+
+export function seatHas(t: Table, guestId: string): boolean {
+  return t.seatOrder.includes(guestId);
+}
+
+/** 找宾客所在桌与位次号（1 起） */
+export function findSeat(plan: Plan, guestId: string): { table: Table; seatIndex: number } | null {
+  for (const t of plan.tables) {
+    const i = t.seatOrder.indexOf(guestId);
+    if (i >= 0) return { table: t, seatIndex: i };
+  }
+  return null;
 }
 
 export function createEmptyPlan(name = '未命名方案'): Plan {
@@ -13,6 +31,8 @@ export function createEmptyPlan(name = '未命名方案'): Plan {
     guests: [],
     rules: [],
     updatedAt: Date.now(),
+    venue: { entranceSide: 'south', stageSide: 'north' },
+    seatMarks: [],
   };
 }
 
@@ -27,8 +47,8 @@ export function getConflictMap(plan: Plan): Map<string, string[]> {
   for (const rule of rules) {
     if (rule.type === 'apart') {
       for (const table of tables) {
-        const hasA = table.seatOrder.includes(rule.a);
-        const hasB = table.seatOrder.includes(rule.b);
+        const hasA = seatHas(table, rule.a);
+        const hasB = seatHas(table, rule.b);
         if (hasA && hasB) {
           if (!map.has(rule.a)) map.set(rule.a, []);
           if (!map.has(rule.b)) map.set(rule.b, []);
@@ -38,8 +58,8 @@ export function getConflictMap(plan: Plan): Map<string, string[]> {
       }
     } else if (rule.type === 'separate') {
       for (const table of tables) {
-        const hasA = table.seatOrder.includes(rule.a);
-        const hasB = table.seatOrder.includes(rule.b);
+        const hasA = seatHas(table, rule.a);
+        const hasB = seatHas(table, rule.b);
         if (hasA && hasB) {
           if (!map.has(rule.a)) map.set(rule.a, []);
           if (!map.has(rule.b)) map.set(rule.b, []);
@@ -50,13 +70,13 @@ export function getConflictMap(plan: Plan): Map<string, string[]> {
     } else if (rule.type === 'together') {
       let same = false;
       for (const table of tables) {
-        const hasA = table.seatOrder.includes(rule.a);
-        const hasB = table.seatOrder.includes(rule.b);
+        const hasA = seatHas(table, rule.a);
+        const hasB = seatHas(table, rule.b);
         if (hasA && hasB) same = true;
       }
       if (!same) {
-        const ta = tables.find((t) => t.seatOrder.includes(rule.a));
-        const tb = tables.find((t) => t.seatOrder.includes(rule.b));
+        const ta = tables.find((t) => seatHas(t, rule.a));
+        const tb = tables.find((t) => seatHas(t, rule.b));
         if (ta && tb && ta.id !== tb.id) {
           if (!map.has(rule.a)) map.set(rule.a, []);
           if (!map.has(rule.b)) map.set(rule.b, []);
@@ -74,13 +94,13 @@ export function getTableStats(plan: Plan) {
   let capacity = 0;
   let emptySeats = 0;
   const unassigned = plan.guests.filter((g) => {
-    const atTable = plan.tables.some((t) => t.seatOrder.includes(g.id));
+    const atTable = plan.tables.some((t) => seatHas(t, g.id));
     return !atTable;
   });
   for (const t of plan.tables) {
-    seated += t.seatOrder.length;
+    seated += occupiedCount(t);
     capacity += t.capacity;
-    emptySeats += Math.max(0, t.capacity - t.seatOrder.length);
+    emptySeats += Math.max(0, t.capacity - occupiedCount(t));
   }
   return { seated, capacity, emptySeats, totalGuests: plan.guests.length, unassignedCount: unassigned.length };
 }
